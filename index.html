@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hyper Coin - Ball Sort Puzzle</title>
+    
+    <script src="https://cdn.unityads.unity3d.com/sdk/4.9.2/unityads.js"></script>
+
+    <style>
+        /* --- CSS Section --- */
+        body {
+            margin: 0;
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 450px;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            border: 2px solid #333;
+        }
+
+        header {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .gold-text {
+            color: #ffcc00;
+            font-size: 2.5rem;
+            margin: 0;
+            text-shadow: 0 0 15px rgba(255, 204, 0, 0.7);
+            letter-spacing: 2px;
+        }
+
+        #level-display {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        #glass-container {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-content: center;
+            gap: 15px;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .tube {
+            width: 55px;
+            height: 160px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top: none;
+            border-radius: 0 0 30px 30px;
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            padding-bottom: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .tube.selected {
+            transform: translateY(-20px);
+            border-color: #ffcc00;
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.4);
+            background: rgba(255, 204, 0, 0.1);
+        }
+
+        .ball {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            margin: 2px;
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            margin-bottom: 80px;
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #ffcc00, #b8860b);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            color: #000;
+            cursor: pointer;
+            font-size: 1rem;
+            box-shadow: 0 4px 15px rgba(255, 204, 0, 0.3);
+        }
+
+        .ad-banner {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <header>
+            <h1 class="gold-text">Hyper Coin</h1>
+            <div id="level-display">Level: <span id="current-level">1</span></div>
+        </header>
+
+        <div id="glass-container"></div>
+
+        <div class="controls">
+            <button onclick="resetLevel()" class="btn-reset">Restart Level</button>
+        </div>
+
+        <div class="ad-banner" id="unity-banner"></div>
+    </div>
+
+    <script>
+        /* --- Unity Ads Configuration --- */
+        const unityGameID = "6072551";
+        const isTestMode = false; // আসল এডের জন্য false রাখা হয়েছে
+
+        function initAds() {
+            if (typeof UnityAds !== 'undefined') {
+                UnityAds.init(unityGameID, isTestMode, {
+                    complete: () => {
+                        console.log("Ads Init Complete");
+                        UnityAds.Banner.show("Banner_Android");
+                    },
+                    error: (error) => console.log("Ads Error: " + error)
+                });
+            }
+        }
+
+        function showInterstitial() {
+            UnityAds.show("Interstitial_Android", {
+                complete: () => nextLevel(),
+                error: (e) => {
+                    console.log("Ad Failed: " + e);
+                    nextLevel();
+                }
+            });
+        }
+
+        /* --- Game Logic Section --- */
+        let selectedTube = null;
+        let currentLevel = 1;
+        const ballsPerTube = 4;
+        const colors = ['#FF3333', '#33FF33', '#3333FF', '#FFFF33', '#FF33FF', '#9933FF', '#00FFFF'];
+
+        function initGame() {
+            const container = document.getElementById('glass-container');
+            container.innerHTML = '';
+            
+            // লেভেল অনুযায়ী রঙের সংখ্যা নির্ধারণ
+            let colorCount = Math.min(currentLevel + 1, colors.length);
+            let allBalls = [];
+            
+            for (let i = 0; i < colorCount; i++) {
+                for (let j = 0; j < ballsPerTube; j++) {
+                    allBalls.push(colors[i]);
+                }
+            }
+
+            // বলগুলো ওলট-পালট (Shuffle) করা
+            allBalls.sort(() => Math.random() - 0.5);
+
+            // টিউব জেনারেশন (২টি খালি টিউব অতিরিক্ত থাকবে)
+            let totalTubes = colorCount + 2;
+            for (let i = 0; i < totalTubes; i++) {
+                const tube = document.createElement('div');
+                tube.className = 'tube';
+                tube.onclick = () => handleTubeClick(tube);
+                
+                if (i < colorCount) {
+                    for (let j = 0; j < ballsPerTube; j++) {
+                        const ball = document.createElement('div');
+                        ball.className = 'ball';
+                        ball.style.backgroundColor = allBalls.pop();
+                        tube.appendChild(ball);
+                    }
+                }
+                container.appendChild(tube);
+            }
+        }
+
+        function handleTubeClick(tube) {
+            if (selectedTube === null) {
+                if (tube.children.length > 0) {
+                    selectedTube = tube;
+                    tube.classList.add('selected');
+                }
+            } else {
+                if (tube !== selectedTube) {
+                    const fromBall = selectedTube.lastElementChild;
+                    const toBall = tube.lastElementChild;
+
+                    // মুভ করার শর্ত: টিউবে জায়গা থাকতে হবে এবং রঙ মিলতে হবে
+                    if (tube.children.length < ballsPerTube) {
+                        if (!toBall || toBall.style.backgroundColor === fromBall.style.backgroundColor) {
+                            tube.appendChild(fromBall);
+                            setTimeout(checkWin, 300);
+                        }
+                    }
+                }
+                selectedTube.classList.remove('selected');
+                selectedTube = null;
+            }
+        }
+
+        function checkWin() {
+            const tubes = Array.from(document.querySelectorAll('.tube'));
+            let win = true;
+
+            let filledTubes = 0;
+            tubes.forEach(tube => {
+                if (tube.children.length > 0) {
+                    filledTubes++;
+                    if (tube.children.length !== ballsPerTube) {
+                        win = false;
+                    } else {
+                        const tubeColors = Array.from(tube.children).map(b => b.style.backgroundColor);
+                        if (!tubeColors.every(c => c === tubeColors[0])) {
+                            win = false;
+                        }
+                    }
+                }
+            });
+
+            if (win && filledTubes > 0) {
+                alert("Level Complete! Loading Ad...");
+                showInterstitial(); // লেভেল শেষ হলেই ইন্টারস্টিশিয়াল অ্যাড দেখাবে
+            }
+        }
+
+        function resetLevel() {
+            initGame();
+        }
+
+        function nextLevel() {
+            currentLevel++;
+            document.getElementById('current-level').innerText = currentLevel;
+            initGame();
+        }
+
+        // গেম এবং অ্যাড শুরু করা
+        window.onload = () => {
+            initGame();
+            initAds();
+        };
+    </script>
+</body>
+</html>
